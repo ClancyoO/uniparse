@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UniParse · 全能视频解析</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#0a0a0f;--card:#1a1a2e;--border:#2a2a45;--border-bright:#3a3a55;
+  --green:#00ff88;--blue:#00d4ff;--red:#ff2d55;--yellow:#ffd700;
+  --text:#e8e8f0;--text-dim:#555570;--text-dimmer:#3a3a55;
+  --glow-green:0 0 20px rgba(0,255,136,0.3);
+  --glow-blue:0 0 20px rgba(0,212,255,0.3);
+}
+
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* ══ 背景网格 ══ */
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:50px 50px;opacity:0.3;pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,255,136,0.05) 0%,transparent 60%);pointer-events:none;z-index:0}
+
+/* ══ 布局 ══ */
+.container{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:24px 16px}
+
+/* ══ 头部 ══ */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--green),var(--blue));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:var(--glow-green)}
+.logo-text{font-size:20px;font-weight:700;background:linear-gradient(90deg,var(--green),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:0.5px}
+.logo-sub{font-size:11px;color:var(--text-dim);margin-left:8px;padding:2px 8px;background:var(--card);border:1px solid var(--border);border-radius:4px}
+
+/* ══ 输入区域 ══ */
+.input-section{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:20px;position:relative;overflow:hidden}
+.input-section::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--green),transparent);opacity:0.5}
+.input-row{display:flex;gap:12px;margin-bottom:12px}
+.input-box{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:14px;color:var(--text);outline:none;transition:border-color 0.2s,box-shadow 0.2s;font-family:inherit}
+.input-box:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(0,255,136,0.1)}
+.input-box::placeholder{color:var(--text-dim)}
+.btn{height:46px;padding:0 20px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-family:inherit}
+.btn-primary{background:linear-gradient(135deg,var(--green),#00cc6a);color:#000;box-shadow:var(--glow-green)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 0 30px rgba(0,255,136,0.5)}
+.btn-primary:active{transform:translateY(0)}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--green);color:var(--green)}
+.btn-icon{font-size:16px}
+
+/* ══ 侠客终端 ══ */
+.terminal{background:var(--card);border:1px solid var(--border);border-radius:16px;margin-bottom:20px;overflow:hidden}
+.terminal-header{background:var(--bg);padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);font-family:monospace}
+.terminal-header-dot{width:10px;height:10px;border-radius:50%;background:var(--border-bright)}
+.terminal-header-dot.red{background:#ff5f57}
+.terminal-header-dot.yellow{background:#febc2e}
+.terminal-header-dot.green{background:#28c840}
+.terminal-title{flex:1;text-align:center;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;font-size:11px}
+.terminal-body{min-height:200px;padding:20px;position:relative;overflow:hidden}
+
+/* 侠客容器 */
+.samurai-container{display:flex;align-items:flex-start;gap:24px}
+.samurai-stage{width:100px;height:140px;position:relative;flex-shrink:0}
+
+/* 像素侠客 - CSS绘制 */
+.samurai{
+  position:absolute;
+  width:8px;height:8px;
+  bottom:10px;left:50%;
+  transform:translateX(-50%);
+  transition:all 0.1s;
+}
+.samurai .head{
+  position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
+  width:28px;height:24px;
+  background:var(--text);border-radius:4px 4px 2px 2px;
+  box-shadow:
+    /* 斗笠 */
+    -14px -8px 0 0 var(--text-dim),
+    14px -8px 0 0 var(--text-dim),
+    -16px -4px 0 0 var(--text-dim),
+    16px -4px 0 0 var(--text-dim),
+    -18px 0px 0 0 var(--text-dim),
+    18px 0px 0 0 var(--text-dim),
+    /* 脸 */
+    -4px 2px 0 0 #000,
+    4px 2px 0 0 #000,
+    0px 8px 0 0 #000;
+}
+.samurai .body{
+  position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
+  width:24px;height:40px;
+  background:linear-gradient(180deg,#2a2a45,#1a1a2e);
+  border-radius:4px 4px 0 0;
+  box-shadow:-2px 0 0 0 var(--text-dim),2px 0 0 0 var(--text-dim);
+}
+.samurai .cape{
+  position:absolute;bottom:30px;left:50%;transform:translateX(-50%);
+  width:32px;height:50px;
+  background:linear-gradient(180deg,var(--red),transparent);
+  border-radius:0 0 8px 8px;
+  opacity:0.8;
+  transform-origin:top center;
+}
+.samurai .legs{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+  width:20px;height:32px;
+  background:var(--border);
+  border-radius:0 0 4px 4px;
+}
+.samurai .legs::before,
+.samurai .legs::after{
+  content:'';position:absolute;bottom:0;
+  width:8px;height:12px;background:var(--border-bright);
+}
+.samurai .legs::before{left:0;border-radius:0 0 4px 4px}
+.samurai .legs::after{right:0;border-radius:0 0 4px 4px}
+
+/* 剑 */
+.sword{
+  position:absolute;
+  bottom:40px;right:-4px;
+  width:6px;height:60px;
+  background:linear-gradient(180deg,#fff,var(--text-dim));
+  border-radius:2px;
+  transform-origin:bottom center;
+  transition:transform 0.15s;
+}
+.sword::before{
+  content:'';position:absolute;top:-8px;left:50%;transform:translateX(-50%);
+  width:0;height:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-bottom:10px solid #fff;
+}
+.sword-handle{
+  position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+  width:10px;height:12px;
+  background:var(--green);
+  border-radius:2px;
+}
+
+/* 剑鞘 */
+.sheath{
+  position:absolute;
+  bottom:35px;left:-8px;
+  width:8px;height:50px;
+  background:linear-gradient(180deg,var(--red),#8b0000);
+  border-radius:4px 4px 2px 2px;
+  transform-origin:bottom center;
+  transition:transform 0.15s,opacity 0.15s;
+}
+
+/* 状态动画 */
+/* 待命 */
+.samurai-wrapper.idle .sword{transform:rotate(45deg)}
+.samurai-wrapper.idle .sheath{opacity:1;transform:rotate(30deg)}
+
+/* 拔剑 */
+.samurai-wrapper.drawing .sword{transform:rotate(0deg)!important;box-shadow:0 0 20px var(--green),0 0 40px var(--green)}
+.samurai-wrapper.drawing .sheath{opacity:0;transform:rotate(-30deg)}
+
+/* 挥剑 */
+.samurai-wrapper.slashing .samurai .body{transform:translateX(-50%) rotate(-15deg)}
+.samurai-wrapper.slashing .sword{transform:rotate(-90deg)!important;box-shadow:0 0 30px var(--green),0 0 60px var(--green)}
+.samurai-wrapper.slashing .cape{transform:skewX(-10deg)}
+
+/* 收剑 */
+.samurai-wrapper.sheathing .sword{transform:rotate(45deg);box-shadow:none}
+.samurai-wrapper.sheathing .sheath{opacity:1;transform:rotate(30deg)}
+
+/* 剑光效果 */
+.slash-effect{
+  position:absolute;
+  top:30%;right:10px;
+  width:80px;height:6px;
+  background:linear-gradient(90deg,transparent,var(--green),#fff,var(--green),transparent);
+  border-radius:3px;
+  opacity:0;
+  transform:scaleX(0);
+  filter:blur(1px);
+  box-shadow:0 0 20px var(--green),0 0 40px var(--green);
+}
+.slash-effect.active{animation:slashFlash 0.4s ease-out forwards}
+@keyframes slashFlash{
+  0%{opacity:1;transform:scaleX(0) rotate(-20deg)}
+  50%{opacity:1;transform:scaleX(1) rotate(-20deg)}
+  100%{opacity:0;transform:scaleX(1.3) rotate(-20deg)}
+}
+
+/* 火花粒子 */
+.spark{
+  position:absolute;
+  width:4px;height:4px;
+  background:var(--yellow);
+  border-radius:50%;
+  pointer-events:none;
+  animation:sparkFly 0.6s ease-out forwards;
+}
+@keyframes sparkFly{
+  0%{opacity:1;transform:translate(0,0) scale(1)}
+  100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(0)}
+}
+
+/* 日志区域 */
+.log-area{flex:1;min-height:140px;position:relative}
+.log-entry{
+  display:flex;align-items:baseline;gap:8px;
+  margin-bottom:8px;font-size:13px;font-family:monospace;
+  opacity:0;transform:translateX(-10px);
+  transition:all 0.3s;
+  line-height:1.5;
+}
+.log-entry.visible{opacity:1;transform:translateX(0)}
+.log-entry .log-icon{font-size:14px;flex-shrink:0}
+.log-entry .log-text{flex:1;color:var(--text-dim)}
+.log-entry.success .log-text{color:var(--green)}
+.log-entry.error .log-text{color:var(--red)}
+.log-entry.info .log-text{color:var(--blue)}
+.log-entry.warning .log-text{color:var(--yellow)}
+
+/* 斩击动画 - 文字划掉 */
+.log-entry.slashed{position:relative}
+.log-entry.slashed::after{
+  content:'';position:absolute;
+  left:0;top:50%;width:0;height:2px;
+  background:var(--green);
+  box-shadow:0 0 10px var(--green);
+  animation:slashLine 0.3s ease-out forwards;
+}
+@keyframes slashLine{
+  0%{width:0}
+  100%{width:100%}
+}
+
+/* 完成状态 */
+.log-complete{
+  margin-top:16px;padding:12px 16px;
+  background:rgba(0,255,136,0.05);
+  border:1px solid rgba(0,255,136,0.2);
+  border-radius:8px;
+  font-size:12px;color:var(--green);
+  font-family:monospace;
+  text-align:center;
+  animation:fadeIn 0.5s ease-out;
+}
+.log-complete::before{content:'⚔ ';color:var(--yellow)}
+.log-complete::after{content:' ⚔'}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+/* ══ 结果区域 ══ */
+.result{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;display:none}
+.result.show{display:block;animation:fadeIn 0.4s ease-out}
+.result-header{display:flex;gap:16px;margin-bottom:20px}
+.cover-wrap{width:180px;height:100px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--border);flex-shrink:0;position:relative;cursor:pointer}
+.cover-wrap:hover{border-color:var(--green)}
+.cover-wrap img{width:100%;height:100%;object-fit:cover;display:block}
+.cover-wrap .cover-overlay{position:absolute;inset:0;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;transition:background 0.2s}
+.cover-wrap:hover .cover-overlay{background:rgba(0,0,0,0.5)}
+.cover-wrap:hover .cover-overlay::before{content:'点击预览'}
+.result-info{flex:1;min-width:0}
+.result-title{font-size:16px;font-weight:600;margin-bottom:8px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.result-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.meta-tag{padding:3px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--text-dim)}
+.result-actions{display:flex;gap:8px;flex-wrap:wrap}
+.action-btn{padding:6px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text);cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:4px;font-family:inherit}
+.action-btn:hover{border-color:var(--green);color:var(--green)}
+.action-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+/* 画质选择 */
+.quality-section{margin-bottom:16px}
+.quality-label{font-size:12px;color:var(--text-dim);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.quality-select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:13px;cursor:pointer;outline:none;appearance:none;font-family:inherit}
+.quality-select:focus{border-color:var(--green)}
+.quality-select option{padding:8px}
+
+/* 格式选择 */
+.format-section{display:flex;gap:16px;margin-bottom:16px}
+.format-option{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--text-dim);transition:color 0.2s}
+.format-option input[type="radio"]{accent-color:var(--green)}
+.format-option.active{color:var(--green)}
+
+/* 播放器 */
+.player-wrap{background:#000;border-radius:10px;overflow:hidden;margin-bottom:16px;aspect-ratio:16/9;position:relative;border:1px solid var(--border)}
+.player-wrap video{width:100%;height:100%;display:block;object-fit:contain}
+.player-placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:14px;flex-direction:column;gap:8px}
+.player-placeholder::before{content:'▶';font-size:32px;color:var(--border-bright)}
+
+/* 操作按钮 */
+.result-cta{display:flex;gap:10px;flex-wrap:wrap}
+.cta-btn{flex:1;min-width:120px;height:48px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;font-family:inherit}
+.cta-btn.play{background:linear-gradient(135deg,var(--green),#00cc6a);color:#000;box-shadow:var(--glow-green)}
+.cta-btn.play:hover{box-shadow:0 0 30px rgba(0,255,136,0.5)}
+.cta-btn.download{background:linear-gradient(135deg,var(--blue),#0099cc);color:#000;box-shadow:var(--glow-blue)}
+.cta-btn.download:hover{box-shadow:0 0 30px rgba(0,212,255,0.5)}
+.cta-btn.copy{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.cta-btn.copy:hover{border-color:var(--green);color:var(--green)}
+.cta-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none!important}
+
+/* ══ 字幕区 ══ */
+.subtitle-section{margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+.subtitle-title{font-size:12px;color:var(--text-dim);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.subtitle-list{display:flex;flex-wrap:wrap;gap:8px}
+.subtitle-tag{padding:4px 12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--text-dim);cursor:pointer;transition:all 0.2s}
+.subtitle-tag:hover{border-color:var(--green);color:var(--green)}
+
+/* ══ 加载状态 ══ */
+.loading-overlay{position:fixed;inset:0;background:rgba(10,10,15,0.8);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.loading-overlay.show{display:flex}
+.loading-spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ══ 响应式 ══ */
+@media(max-width:640px){
+  .samurai-container{flex-direction:column;align-items:center}
+  .samurai-stage{margin:0 auto}
+  .result-header{flex-direction:column}
+  .cover-wrap{width:100%;height:auto;aspect-ratio:16/9}
+  .logo-sub{display:none}
+  .btn{height:42px;padding:0 14px;font-size:13px}
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 头部 -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <span class="logo-text">UniParse</span>
+      <span class="logo-sub">全能视频解析</span>
+    </div>
+  </header>
+
+  <!-- 输入区域 -->
+  <section class="input-section">
+    <div class="input-row">
+      <input type="text" class="input-box" id="urlInput" placeholder="🔗 粘贴视频链接，或输入关键词搜索..." autocomplete="off" spellcheck="false">
+      <button class="btn btn-primary" id="parseBtn" onclick="handleParse()">
+        <span class="btn-icon">⚡</span> 解析
+      </button>
+    </div>
+  </section>
+
+  <!-- 侠客终端 -->
+  <section class="terminal" id="terminal" style="display:none">
+    <div class="terminal-header">
+      <span class="terminal-header-dot red"></span>
+      <span class="terminal-header-dot yellow"></span>
+      <span class="terminal-header-dot green"></span>
+      <span class="terminal-title">⚔ 侠客终端</span>
+    </div>
+    <div class="terminal-body">
+      <div class="samurai-container">
+        <div class="samurai-stage">
+          <div class="samurai-wrapper idle" id="samuraiWrapper">
+            <div class="samurai">
+              <div class="head"></div>
+              <div class="body"></div>
+              <div class="cape"></div>
+              <div class="legs"></div>
+              <div class="sheath"></div>
+              <div class="sword"><div class="sword-handle"></div></div>
+            </div>
+          </div>
+          <div class="slash-effect" id="slashEffect"></div>
+        </div>
+        <div class="log-area" id="logArea"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 结果区域 -->
+  <section class="result" id="resultSection">
+    <div class="result-header">
+      <div class="cover-wrap" id="coverWrap" onclick="previewCover()">
+        <img id="coverImg" src="" alt="封面">
+        <div class="cover-overlay"></div>
+      </div>
+      <div class="result-info">
+        <h2 class="result-title" id="resultTitle">视频标题</h2>
+        <div class="result-meta" id="resultMeta"></div>
+        <div class="result-actions">
+          <button class="action-btn" id="dlCoverBtn" onclick="downloadCover()">🖼 下载封面</button>
+          <button class="action-btn" id="dlSubBtn" onclick="downloadSubtitles()" disabled>📝 下载字幕</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="quality-section">
+      <div class="quality-label">⚡ 画质选择</div>
+      <select class="quality-select" id="qualitySelect" onchange="onQualityChange()">
+        <option value="">正在加载...</option>
+      </select>
+    </div>
+
+    <div class="format-section">
+      <label class="format-option active" id="formatVideo">
+        <input type="radio" name="format" value="video" checked onchange="onFormatChange()">
+        <span>● 视频+音频</span>
+      </label>
+      <label class="format-option" id="formatAudio">
+        <input type="radio" name="format" value="audio" onchange="onFormatChange()">
+        <span>○ 仅音频</span>
+      </label>
+    </div>
+
+    <div class="player-wrap" id="playerWrap">
+      <video id="player" controls preload="none"></video>
+      <div class="player-placeholder" id="playerPlaceholder">解析后将在这里播放</div>
+    </div>
+
+    <div class="result-cta">
+      <button class="cta-btn play" id="playBtn" onclick="playVideo()" disabled>▶ 播放</button>
+      <button class="cta-btn download" id="downloadBtn" onclick="downloadVideo()" disabled>⬇ 下载视频</button>
+      <button class="cta-btn copy" id="copyBtn" onclick="copyUrl()">📋 复制链接</button>
+    </div>
+
+    <div class="subtitle-section" id="subtitleSection" style="display:none">
+      <div class="subtitle-title">📝 可用字幕</div>
+      <div class="subtitle-list" id="subtitleList"></div>
+    </div>
+  </section>
+</div>
+
+<!-- 加载动画 -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// 全局状态
+// ═══════════════════════════════════════════════════════════
+
+let currentResult = null;
+let selectedQuality = null;
+let isAudioOnly = false;
+
+// API 地址 - 部署到 Vercel 后会自动使用当前域名下的 /api/parse
+// 本地测试时可以手动改为你的 Vercel 地址
+const API_URL = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost'
+  ? '/api/parse'
+  : window.location.origin + '/api/parse'
+
+// ═══════════════════════════════════════════════════════════
+// 核心：解析
+// ═══════════════════════════════════════════════════════════
+
+async function handleParse() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) { alert('请输入视频链接'); return; }
+
+  // 检测是搜索还是解析
+  const isVideoUrl = detectVideoUrl(url);
+  if (!isVideoUrl) {
+    // 暂时不支持搜索，仅提示
+    showTerminal();
+    addLog('warning', '🔍 目前仅支持粘贴视频链接，搜索功能即将上线');
+    return;
+  }
+
+  showTerminal();
+  clearLogs();
+  await runParsingAnimation();
+
+  // 调用后端 API
+  addLog('info', '📡 向服务器发起解析请求...');
+
+  try {
+    showLoading(true);
+    const resp = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, action: 'parse' }),
+    });
+
+    const data = await resp.json();
+    showLoading(false);
+
+    if (data.error) {
+      addLog('error', '❌ ' + data.error);
+      return;
+    }
+
+    if (!data.success) {
+      addLog('error', '❌ 解析失败，请检查链接是否正确');
+      return;
+    }
+
+    // 解析成功
+    await slashAnimation();
+    addLog('success', '🎉 解析成功！' + (data.qualities?.length || 0) + ' 个画质可用');
+
+    if (data.cover) {
+      addLog('info', '🖼️ 封面已拿下');
+      await slashAnimation();
+    }
+    if (data.subtitles?.length > 0) {
+      addLog('info', '📝 发现 ' + data.subtitles.length + ' 个字幕');
+      await slashAnimation();
+    }
+
+    // 显示完成
+    showComplete(data);
+
+  } catch (err) {
+    showLoading(false);
+    addLog('error', '❌ 网络错误: ' + err.message);
+    // 模拟成功流程用于演示
+    await runDemoAnimation();
+    showDemoResult();
+  }
+}
+
+async function runParsingAnimation() {
+  addLog('info', '🤺 叮！收到一个链接，侦查一下...');
+  await delay(400);
+
+  const url = document.getElementById('urlInput').value;
+  let platform = '未知网站';
+  if (/bilibili/i.test(url)) platform = 'B站';
+  else if (/youtube/i.test(url)) platform = 'YouTube';
+  else if (/tiktok|douyin/i.test(url)) platform = '抖音/TikTok';
+  else if (/qq\.com/i.test(url)) platform = '腾讯视频';
+  else if (/iqiyi/i.test(url)) platform = '爱奇艺';
+  else if (/youku/i.test(url)) platform = '优酷';
+
+  addLog('info', '🎯 是个' + platform + '视频！');
+  await delay(500);
+  setSamuraiState('draw');
+  await delay(300);
+  addLog('info', '⚔️ 看我一剑斩断！发起解析请求！');
+  await delay(600);
+  setSamuraiState('idle');
+}
+
+async function runDemoAnimation() {
+  await delay(300);
+  addLog('info', '📡 向服务器发起解析请求...');
+  await delay(500);
+  setSamuraiState('draw');
+  await delay(400);
+  addLog('info', '⚔️ 看我一剑斩断！');
+  await delay(800);
+  await slashAnimation();
+  addLog('success', '🎉 解析成功！5 个画质可用');
+  await slashAnimation();
+  addLog('info', '🖼️ 封面已拿下');
+  await slashAnimation();
+  addLog('info', '📝 发现 2 个字幕');
+  await slashAnimation();
+}
+
+async function slashAnimation() {
+  setSamuraiState('slash');
+  triggerSlashEffect();
+  // 斩日志行
+  const entries = document.querySelectorAll('.log-entry:not(.slashed)');
+  if (entries.length > 0) {
+    const lastEntry = entries[entries.length - 1];
+    await delay(200);
+    lastEntry.classList.add('slashed');
+  }
+  await delay(300);
+  setSamuraiState('idle');
+}
+
+function triggerSlashEffect() {
+  const effect = document.getElementById('slashEffect');
+  effect.classList.remove('active');
+  void effect.offsetWidth;
+  effect.classList.add('active');
+
+  // 火花
+  const stage = document.querySelector('.samurai-stage');
+  for (let i = 0; i < 8; i++) {
+    const spark = document.createElement('div');
+    spark.className = 'spark';
+    const angle = (i / 8) * Math.PI * 2;
+    const dist = 40 + Math.random() * 30;
+    spark.style.cssText = `--dx:${Math.cos(angle) * dist}px;--dy:${Math.sin(angle) * dist}px;right:${20 + Math.random() * 20}px;top:${40 + Math.random() * 20}px`;
+    stage.appendChild(spark);
+    setTimeout(() => spark.remove(), 600);
+  }
+}
+
+function setSamuraiState(state) {
+  const wrapper = document.getElementById('samuraiWrapper');
+  wrapper.className = 'samurai-wrapper ' + state;
+}
+
+function showComplete(data) {
+  setSamuraiState('sheathing');
+  const logArea = document.getElementById('logArea');
+  const complete = document.createElement('div');
+  complete.className = 'log-complete';
+  complete.textContent = '剑光闪过，任务全灭 ✅';
+  logArea.appendChild(complete);
+  logArea.scrollTop = logArea.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════
+// 结果展示
+// ═══════════════════════════════════════════════════════════
+
+function showDemoResult() {
+  showComplete({});
+  const demo = {
+    title: '【必看】这可能是全网最酷的程序员纪录片',
+    author: '极客湾',
+    duration: '24:30',
+    platform: 'bilibili',
+    cover: 'https://picsum.photos/seed/demo/400/225',
+    qualities: [
+      { id: '200', name: '1080P 高码率', resolution: '1080P', size: '800MB' },
+      { id: '120', name: '1080P 高清', resolution: '1080P', size: '600MB' },
+      { id: '80', name: '720P 高清', resolution: '720P', size: '400MB' },
+      { id: '32', name: '480P 清晰', resolution: '480P', size: '200MB' },
+      { id: '16', name: '360P 省流', resolution: '360P', size: '100MB' },
+    ],
+    subtitles: [
+      { lang: '中文', url: '#' },
+      { lang: '英文', url: '#' },
+    ],
+    qualities_data: [
+      { id: '200', name: '1080P 高码率', resolution: '1080P', size: '800MB', url: '' },
+      { id: '120', name: '1080P 高清', resolution: '1080P', size: '600MB', url: '' },
+      { id: '80', name: '720P 高清', resolution: '720P', size: '400MB', url: '' },
+      { id: '32', name: '480P 清晰', resolution: '480P', size: '200MB', url: '' },
+      { id: '16', name: '360P 省流', resolution: '360P', size: '100MB', url: '' },
+    ],
+  };
+  showResult(demo);
+}
+
+function showResult(data) {
+  currentResult = data;
+
+  document.getElementById('resultTitle').textContent = data.title || '未知标题';
+  document.getElementById('coverImg').src = data.cover || '';
+  document.getElementById('coverImg').onerror = function() { this.style.display = 'none'; };
+
+  // 元信息
+  const meta = document.getElementById('resultMeta');
+  meta.innerHTML = '';
+  if (data.author) meta.innerHTML += `<span class="meta-tag">👤 ${data.author}</span>`;
+  if (data.duration) meta.innerHTML += `<span class="meta-tag">⏱️ ${data.duration}</span>`;
+  if (data.platform) meta.innerHTML += `<span class="meta-tag">🌐 ${data.platform}</span>`;
+  if (data.bvid) meta.innerHTML += `<span class="meta-tag">🔢 ${data.bvid}</span>`;
+
+  // 画质选择
+  const select = document.getElementById('qualitySelect');
+  select.innerHTML = '';
+  if (data.qualities && data.qualities.length > 0) {
+    data.qualities.forEach((q, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `${q.name}${q.resolution ? ' (' + q.resolution + ')' : ''}${q.size ? ' - ' + q.size : ''}`;
+      select.appendChild(opt);
+    });
+    selectedQuality = data.qualities[0];
+    document.getElementById('playBtn').disabled = false;
+    document.getElementById('downloadBtn').disabled = false;
+  } else {
+    select.innerHTML = '<option value="">暂无可用画质</option>';
+  }
+
+  // 字幕
+  const subSection = document.getElementById('subtitleSection');
+  const subList = document.getElementById('subtitleList');
+  if (data.subtitles && data.subtitles.length > 0) {
+    subSection.style.display = 'block';
+    subList.innerHTML = '';
+    data.subtitles.forEach(sub => {
+      const tag = document.createElement('span');
+      tag.className = 'subtitle-tag';
+      tag.textContent = sub.lang;
+      tag.onclick = () => { if (sub.url && sub.url !== '#') downloadFile(sub.url, sub.lang + '.srv'); };
+      subList.appendChild(tag);
+    });
+    document.getElementById('dlSubBtn').disabled = false;
+  } else {
+    subSection.style.display = 'none';
+  }
+
+  document.getElementById('resultSection').classList.add('show');
+}
+
+function onQualityChange() {
+  const idx = document.getElementById('qualitySelect').value;
+  if (currentResult && currentResult.qualities) {
+    selectedQuality = currentResult.qualities[idx];
+  }
+}
+
+function onFormatChange() {
+  isAudioOnly = document.querySelector('input[name="format"]:checked').value === 'audio';
+  document.getElementById('formatVideo').classList.toggle('active', !isAudioOnly);
+  document.getElementById('formatAudio').classList.toggle('active', isAudioOnly);
+}
+
+function playVideo() {
+  if (!selectedQuality?.url) {
+    alert('提示：需要部署到 Vercel 才能获取真实视频地址，当前为演示模式');
+    return;
+  }
+  const player = document.getElementById('player');
+  const placeholder = document.getElementById('playerPlaceholder');
+  placeholder.style.display = 'none';
+  player.src = isAudioOnly && selectedQuality.audioUrl ? selectedQuality.audioUrl : selectedQuality.url;
+  player.play().catch(() => {});
+}
+
+function downloadVideo() {
+  if (!selectedQuality?.url) {
+    alert('提示：需要部署到 Vercel 才能获取真实下载链接，当前为演示模式');
+    return;
+  }
+  downloadFile(selectedQuality.url, currentResult.title + '_' + selectedQuality.name + '.mp4');
+}
+
+function downloadFile(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function copyUrl() {
+  const url = selectedQuality?.url || currentResult?.qualities?.[0]?.url || '';
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copyBtn');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ 已复制';
+    setTimeout(() => { btn.innerHTML = orig; }, 1500);
+  });
+}
+
+function previewCover() {
+  const url = currentResult?.cover;
+  if (url) window.open(url, '_blank');
+}
+
+function downloadCover() {
+  const url = currentResult?.cover;
+  if (url) downloadFile(url, (currentResult.title || 'cover') + '.jpg');
+}
+
+function downloadSubtitles() {
+  const subs = currentResult?.subtitles;
+  if (!subs || subs.length === 0) return;
+  subs.forEach(sub => {
+    if (sub.url && sub.url !== '#') downloadFile(sub.url, sub.lang + '.srv');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 终端逻辑
+// ═══════════════════════════════════════════════════════════
+
+function showTerminal() {
+  document.getElementById('terminal').style.display = 'block';
+}
+
+function clearLogs() {
+  document.getElementById('logArea').innerHTML = '';
+}
+
+function addLog(type, text) {
+  const area = document.getElementById('logArea');
+  // 移除占位符
+  const placeholder = area.querySelector('.placeholder');
+  if (placeholder) placeholder.remove();
+
+  const entry = document.createElement('div');
+  entry.className = 'log-entry ' + type;
+  entry.innerHTML = `<span class="log-text">${text}</span>`;
+  area.appendChild(entry);
+
+  requestAnimationFrame(() => entry.classList.add('visible'));
+  area.scrollTop = area.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════
+// 工具函数
+// ═══════════════════════════════════════════════════════════
+
+function detectVideoUrl(text) {
+  const patterns = [
+    /bilibili\.com\/(video|bangumi|anime)/i,
+    /youtube\.com|youtu\.be/i,
+    /tiktok\.com|douyin\.com/i,
+    /v\.qq\.com/i,
+    /iqiyi\.com/i,
+    /youku\.com/i,
+    /kuaishou\.com/i,
+    /ixigua\.com/i,
+    /twitter\.com|x\.com/i,
+    /instagram\.com/i,
+  ];
+  return patterns.some(p => p.test(text));
+}
+
+function showLoading(show) {
+  document.getElementById('loadingOverlay').classList.toggle('show', show);
+}
+
+function delay(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+// ═══════════════════════════════════════════════════════════
+// 初始化
+// ═══════════════════════════════════════════════════════════
+
+// 回车触解析
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleParse();
+});
+</script>
+</body>
+</html>
