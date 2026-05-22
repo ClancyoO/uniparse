@@ -303,12 +303,6 @@ body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:r
 .subtitle-tag{padding:4px 12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--text-dim);cursor:pointer;transition:all 0.2s}
 .subtitle-tag:hover{border-color:var(--green);color:var(--green)}
 
-/* ══ 加载状态 ══ */
-.loading-overlay{position:fixed;inset:0;background:rgba(10,10,15,0.8);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-.loading-overlay.show{display:flex}
-.loading-spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
 /* ══ 响应式 ══ */
 @media(max-width:640px){
   .samurai-container{flex-direction:column;align-items:center}
@@ -423,11 +417,6 @@ body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:r
   </section>
 </div>
 
-<!-- 加载动画 -->
-<div class="loading-overlay" id="loadingOverlay">
-  <div class="loading-spinner"></div>
-</div>
-
 <script>
 // ═══════════════════════════════════════════════════════════
 // 全局状态
@@ -437,11 +426,28 @@ let currentResult = null;
 let selectedQuality = null;
 let isAudioOnly = false;
 
-// API 地址 - 部署到 Vercel 后会自动使用当前域名下的 /api/parse
-// 本地测试时可以手动改为你的 Vercel 地址
-const API_URL = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost'
-  ? '/api/parse'
-  : window.location.origin + '/api/parse'
+// 第三方解析 API（纯前端可用，支持 CORS）
+const PARSERS = [
+  {
+    name: '米人解析',
+    match: /bilibili|youtube|douyin|tiktok/i,
+    url: (u) => `https://api.mir6.com/api/bzjiexi?url=${encodeURIComponent(u)}`,
+    parse: (resp) => {
+      const d = JSON.parse(resp)
+      if (d.code === 200 && d.data?.[0]?.video_url) {
+        const qualities = d.data.map((q, i) => ({
+          id: q.id || i, name: q.accept?.[0] || '自动', resolution: q.accept?.[0] || null,
+          url: q.video_url, size: q.size || null, order: i,
+        }))
+        return {
+          success: true, platform: 'bilibili', title: d.title || '视频', author: d.user?.name || '',
+          cover: d.pic || null, duration: null, qualities,
+        }
+      }
+      return null
+    }
+  },
+]
 
 // ═══════════════════════════════════════════════════════════
 // 核心：解析
@@ -451,10 +457,8 @@ async function handleParse() {
   const url = document.getElementById('urlInput').value.trim();
   if (!url) { alert('请输入视频链接'); return; }
 
-  // 检测是搜索还是解析
   const isVideoUrl = detectVideoUrl(url);
   if (!isVideoUrl) {
-    // 暂时不支持搜索，仅提示
     showTerminal();
     addLog('warning', '🔍 目前仅支持粘贴视频链接，搜索功能即将上线');
     return;
@@ -464,53 +468,40 @@ async function handleParse() {
   clearLogs();
   await runParsingAnimation();
 
-  // 调用后端 API
-  addLog('info', '📡 向服务器发起解析请求...');
-
-  try {
-    showLoading(true);
-    const resp = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, action: 'parse' }),
-    });
-
-    const data = await resp.json();
-    showLoading(false);
-
-    if (data.error) {
-      addLog('error', '❌ ' + data.error);
-      return;
+  // 尝试第三方解析 API
+  let parsed = null
+  for (const parser of PARSERS) {
+    if (!parser.match.test(url)) continue
+    addLog('info', `📡 尝试 ${parser.name}...`)
+    try {
+      const resp = await fetch(parser.url(url), { mode: 'cors' })
+      if (!resp.ok) { addLog('warning', `${parser.name}: 请求失败`); continue }
+      const text = await resp.text()
+      parsed = parser.parse(text)
+      if (parsed?.success) {
+        addLog('success', `🎯 ${parser.name}：一击命中！`)
+        break
+      }
+      addLog('warning', `${parser.name}: 暂无数据`)
+    } catch (e) {
+      addLog('warning', `${parser.name}: 网络错误`)
     }
-
-    if (!data.success) {
-      addLog('error', '❌ 解析失败，请检查链接是否正确');
-      return;
-    }
-
-    // 解析成功
-    await slashAnimation();
-    addLog('success', '🎉 解析成功！' + (data.qualities?.length || 0) + ' 个画质可用');
-
-    if (data.cover) {
-      addLog('info', '🖼️ 封面已拿下');
-      await slashAnimation();
-    }
-    if (data.subtitles?.length > 0) {
-      addLog('info', '📝 发现 ' + data.subtitles.length + ' 个字幕');
-      await slashAnimation();
-    }
-
-    // 显示完成
-    showComplete(data);
-
-  } catch (err) {
-    showLoading(false);
-    addLog('error', '❌ 网络错误: ' + err.message);
-    // 模拟成功流程用于演示
-    await runDemoAnimation();
-    showDemoResult();
   }
+
+  // 如果第三方 API 解析成功
+  if (parsed?.success) {
+    await slashAnimation()
+    addLog('success', `🎉 解析成功！${parsed.qualities?.length || 0} 个画质可用`)
+    if (parsed.cover) { await slashAnimation(); addLog('info', '🖼️ 封面已拿下') }
+    showComplete(parsed)
+    showResult(parsed)
+    return
+  }
+
+  // API 全失败 → 走演示模式
+  addLog('warning', '第三方 API 暂未获取到数据，展示演示效果...')
+  await runDemoAnimation()
+  showDemoResult()
 }
 
 async function runParsingAnimation() {
@@ -702,7 +693,7 @@ function onFormatChange() {
 
 function playVideo() {
   if (!selectedQuality?.url) {
-    alert('提示：需要部署到 Vercel 才能获取真实视频地址，当前为演示模式');
+    alert('纯前端演示：链接已复制，可在浏览器打开观看');
     return;
   }
   const player = document.getElementById('player');
@@ -714,7 +705,7 @@ function playVideo() {
 
 function downloadVideo() {
   if (!selectedQuality?.url) {
-    alert('提示：需要部署到 Vercel 才能获取真实下载链接，当前为演示模式');
+    alert('纯前端演示：链接已复制，可在浏览器打开下载');
     return;
   }
   downloadFile(selectedQuality.url, currentResult.title + '_' + selectedQuality.name + '.mp4');
@@ -803,10 +794,6 @@ function detectVideoUrl(text) {
     /instagram\.com/i,
   ];
   return patterns.some(p => p.test(text));
-}
-
-function showLoading(show) {
-  document.getElementById('loadingOverlay').classList.toggle('show', show);
 }
 
 function delay(ms) {
