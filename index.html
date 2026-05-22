@@ -307,7 +307,6 @@ body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:r
 .mode-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:12px}
 .mode-badge.direct{background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);color:var(--green)}
 .mode-badge.iframe{background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:var(--blue)}
-.mode-badge.demo{background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.3);color:var(--yellow)}
 .mode-badge .badge-icon{font-size:14px}
 
 /* iframe 播放器 */
@@ -331,6 +330,12 @@ body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:r
 .iframe-cta-btn.open:hover{border-color:var(--blue)}
 .iframe-cta-btn.copy{background:var(--card);color:var(--text);border:1px solid var(--border)}
 .iframe-cta-btn.copy:hover{border-color:var(--blue);color:var(--blue)}
+
+/* 错误提示 */
+.error-box{text-align:center;padding:40px 20px;background:var(--card);border-radius:14px;border:1px solid var(--border);margin-bottom:16px}
+.error-icon{font-size:48px;color:var(--red);margin-bottom:12px}
+.error-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px}
+.error-msg{font-size:13px;color:var(--text-dim);line-height:1.6}
 
 /* ══ 响应式 ══ */
 @media(max-width:640px){
@@ -462,6 +467,14 @@ body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:r
       <button class="cta-btn play" id="playBtn" onclick="playVideo()" disabled>▶ 播放</button>
       <button class="cta-btn download" id="downloadBtn" onclick="downloadVideo()" disabled>⬇ 下载视频</button>
       <button class="cta-btn copy" id="copyBtn" onclick="copyUrl()">📋 复制链接</button>
+    </div>
+
+    <!-- 解析失败提示 -->
+    <div class="error-box" id="errorBox" style="display:none">
+      <div class="error-icon">✖</div>
+      <div class="error-title">无法解析该视频</div>
+      <div class="error-msg" id="errorMsg">所有解析源均无法加载此视频，请检查链接是否正确</div>
+      <button class="cta-btn" onclick="hideResult()" style="margin-top:16px;background:transparent;border:1px solid var(--border);color:var(--text-dim);cursor:pointer">← 返回重试</button>
     </div>
 
     <div class="subtitle-section" id="subtitleSection" style="display:none">
@@ -618,6 +631,42 @@ async function probeSources(sources, input) {
   return sources.filter((_, i) => results[i].status === 'fulfilled')
 }
 
+// ── 逐个尝试 iframe 加载（8秒超时） ──
+function tryIframe(url, timeout) {
+  return new Promise((resolve) => {
+    const el = document.createElement('iframe')
+    el.style.display = 'none'
+    el.src = url
+    el.sandbox = 'allow-scripts allow-same-origin allow-forms'
+    let done = false
+    const finish = (ok) => { if (done) return; done = true; clearTimeout(timer); el.remove(); resolve(ok) }
+    el.onload = () => finish(true)
+    el.onerror = () => finish(false)
+    const timer = setTimeout(() => finish(false), timeout)
+    document.body.appendChild(el)
+  })
+}
+
+// ── 显示解析失败 ──
+function showParseError(msg) {
+  hideResultContent()
+  document.getElementById('errorMsg').textContent = msg || '所有解析源均无法加载此视频'
+  document.getElementById('errorBox').style.display = 'block'
+  document.getElementById('resultSection').classList.add('show')
+}
+
+function hideResultContent() {
+  document.getElementById('directControls').style.display = 'none'
+  document.getElementById('formatSection').style.display = 'none'
+  document.getElementById('playerWrap').style.display = 'none'
+  document.getElementById('directCta').style.display = 'none'
+  document.getElementById('iframeWrap').style.display = 'none'
+  document.getElementById('sourceSwitcher').style.display = 'none'
+  document.getElementById('iframeCta').style.display = 'none'
+  document.getElementById('subtitleSection').style.display = 'none'
+  document.getElementById('errorBox').style.display = 'none'
+}
+
 // JSONP 辅助
 function jsonpFetch(url) {
   return new Promise((resolve, reject) => {
@@ -630,61 +679,6 @@ function jsonpFetch(url) {
     document.body.appendChild(scr)
     setTimeout(() => { if (window[cb]) { delete window[cb]; scr.remove(); reject(new Error('JSONP timeout')) } }, 10000)
   })
-}
-
-// ═════════════════════════════════════════════════════════════
-// 第三层：真实可播演示视频（兜底）
-// ═════════════════════════════════════════════════════════════
-
-const DEMO_VIDEOS = [
-  {
-    id: 'demo-bunny', platform: '开源',
-    title: 'Big Buck Bunny — 开源3D动画短片',
-    author: 'Blender Foundation',
-    duration: '00:09:56',
-    cover: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg',
-    qualities: [
-      { id: '1080', name: '1080P 高清', resolution: '1080P', size: '120MB', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' },
-      { id: '720', name: '720P 清晰', resolution: '720P', size: '80MB', url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4' },
-      { id: '480', name: '480P 流畅', resolution: '480P', size: '50MB', url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4' },
-      { id: '360', name: '360P 省流', resolution: '360P', size: '30MB', url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' },
-    ],
-    subtitles: [{ lang: '中文', url: '#' }, { lang: 'English', url: '#' }],
-  },
-  {
-    id: 'demo-elephant', platform: '开源',
-    title: 'Elephant Dream — 首部开源动画电影',
-    author: 'Blender Foundation',
-    duration: '00:10:53',
-    cover: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Elephants_Dream_s5_big.jpg/800px-Elephants_Dream_s5_big.jpg',
-    qualities: [
-      { id: '720', name: '720P 高清', resolution: '720P', size: '110MB', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4' },
-      { id: '480', name: '480P 清晰', resolution: '480P', size: '70MB', url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4' },
-    ],
-    subtitles: [],
-  },
-  {
-    id: 'demo-sintel', platform: '开源',
-    title: 'Sintel — Blender开源动画',
-    author: 'Blender Foundation',
-    duration: '00:14:48',
-    cover: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Sintel_poster.jpg/800px-Sintel_poster.jpg',
-    qualities: [
-      { id: '1080', name: '1080P 高清', resolution: '1080P', size: '150MB', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4' },
-      { id: '720', name: '720P 清晰', resolution: '720P', size: '90MB', url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4' },
-    ],
-    subtitles: [],
-  },
-]
-
-function getDemoForPlatform(platform) {
-  const map = { bilibili: 0, youtube: 1, douyin: 2, tencent: 2, iqiyi: 1, youku: 0 }
-  const idx = map[platform] !== undefined ? map[platform] : Math.floor(Math.random() * DEMO_VIDEOS.length)
-  const vid = { ...DEMO_VIDEOS[idx] }
-  vid.platform = `${platformLabel(platform)} · 演示`
-  vid.title = `${platformLabel(platform)}演示 · ${vid.title}`
-  vid._mode = 'demo'
-  return vid
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -740,73 +734,61 @@ async function handleParse() {
     return
   }
 
-  // ── 有元数据无直链 → 走 iframe ──
-  if (parsed?.success) {
-    addLog('info', '📡 有视频信息，但无直链，换 iframe 解析...')
-    await delay(300)
-  } else {
-    addLog('warning', '⚠️ 直链 API 均无响应，启动 iframe 解析...')
-    await delay(300)
-  }
-
-  // ── 阶段2：iframe 解析 + 批量探测 ──
+  // ── 阶段2：iframe 顺序加载 ──
   setSamuraiState('draw')
-  addLog('info', '🔗 撒网！正在探测 40+ 解析源...')
-  await delay(300)
-
-  const matchedIframes = IFRAME_SOURCES.filter(s => s.match(input))
-
-  // 并行探测所有解析源（5秒超时）
-  let available = []
-  try {
-    available = await probeSources(matchedIframes, input)
-  } catch(e) {}
-
-  const alive = available.length
-  const total = matchedIframes.length
-
-  if (alive > 0) {
-    addLog('success', `📡 探测完毕：${alive}/${total} 个解析源存活`)
-  } else {
-    addLog('warning', `⚠️ 探测完毕：${total} 个源均无响应（可能都挂了）`)
-    if (matchedIframes.length > 0) {
-      addLog('info', '😤 不管了，直接上第一个试试...')
-      available = [matchedIframes[0]]
-    }
-  }
+  addLog('info', '📡 直链不行，换 iframe 解析...')
   await delay(200)
 
-  const firstSource = available[0]
-  iframeUrl = firstSource ? firstSource.url(input) : ''
+  const matchedIframes = IFRAME_SOURCES.filter(s => s.match(input))
+  if (matchedIframes.length === 0) {
+    addLog('warning', '⚠️ 该平台不支持 iframe 解析')
+    await delay(200)
+    showParseError('该视频平台暂不支持解析')
+    return
+  }
 
-  const metadata = parsed || { success: true, platform, title: `${platformLabel(platform)}视频`, author: '', cover: null, duration: null, bvid: null, qualities: [], subtitles: [] }
+  // 快速探测存活的源
+  addLog('info', `🔍 探测 ${matchedIframes.length} 个解析源...`)
+  let available = []
+  try { available = await probeSources(matchedIframes, input) } catch(e) {}
+  if (available.length === 0) available = [matchedIframes[0]]
+  addLog('info', `📡 存活 ${available.length}/${matchedIframes.length} 个，逐个加载中...`)
 
-  if (iframeUrl) {
-    addLog('success', `🎯 ${firstSource.name}：iframe 就位！`)
+  const metadata = parsed || { 
+    success: true, platform, 
+    title: `${platformLabel(platform)}视频`, 
+    author: '', cover: null, duration: null, 
+    qualities: [], subtitles: [] 
+  }
+
+  // 逐个尝试加载 iframe，直到成功
+  let loaded = null
+  for (let i = 0; i < available.length; i++) {
+    const src = available[i]
+    addLog('info', `🔄 (${i + 1}/${available.length}) ${src.name}...`)
+    const ok = await tryIframe(src.url(input), 8000)
+    if (ok) {
+      loaded = src
+      addLog('success', `🎯 ${src.name}：加载成功！`)
+      break
+    }
+    addLog('warning', `${src.name}：无响应`)
+  }
+
+  if (loaded) {
+    iframeUrl = loaded.url(input)
     await slashAnimation()
     if (metadata.cover) { await slashAnimation(); addLog('info', '🖼️ 封面拿下') }
     setSamuraiState('sheathing')
-    addLog('complete', `✅ iframe 搞定！${alive > 1 ? '还有 ' + (alive - 1) + ' 个备用源' : ''}`)
+    addLog('complete', `✅ 搞定！`)
     showResultIframe(metadata, available, input)
     return
   }
 
-  // ── 阶段3：演示模式兜底 ──
-  addLog('warning', '⚠️ 所有解析方式均不可用，展示演示内容...')
-  const demo = getDemoForPlatform(platform)
-  setSamuraiState('draw')
-  addLog('info', '⚔️ 看我一剑斩破屏障！')
-  await delay(500)
-  await slashAnimation()
-  addLog('success', `🎉 ${demo.qualities.length} 个画质（均可播）`)
-  await slashAnimation()
-  addLog('info', '🖼️ 封面已拿下')
-  await slashAnimation()
-  addLog('info', '📝 字幕已准备就绪')
-  await delay(300)
-  setSamuraiState('sheathing')
-  addLog('complete', '✅ 演示模式，请享用！')
-  showResultDirect(demo)
+  // ── 全部失败 ──
+  setSamuraiState('idle')
+  addLog('complete', '❌ 所有解析源均无法加载')
+  showParseError('所有解析源均无法加载此视频，请检查链接是否正确')
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -817,7 +799,7 @@ function showResultDirect(data) {
   currentResult = data
   currentMode = 'direct'
 
-  setModeBadge('direct', data._mode === 'demo' ? '演示' : '直链播放')
+  setModeBadge('direct', '直链播放')
   showCommonInfo(data)
 
   // 显示直链控件
@@ -942,7 +924,7 @@ function setModeBadge(type, text) {
   const icon = document.getElementById('badgeIcon')
   badge.style.display = 'inline-flex'
   badge.className = 'mode-badge ' + type
-  const icons = { direct: '⚡', iframe: '🔗', demo: '🎬' }
+  const icons = { direct: '⚡', iframe: '🔗' }
   icon.textContent = icons[type] || '⚡'
   document.getElementById('badgeText').textContent = text
 }
@@ -986,6 +968,7 @@ function showSubtitles(data) {
 function hideResult() {
   document.getElementById('resultSection').classList.remove('show')
   document.getElementById('modeBadge').style.display = 'none'
+  hideResultContent()
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -1076,11 +1059,9 @@ async function handleSearch(keyword) {
     addLog('success', `📺 「${keyword}」相关结果 ${i} — UP主`)
   }
   await delay(200)
-  const demo = DEMO_VIDEOS[Math.floor(Math.random() * DEMO_VIDEOS.length)]
-  addLog('info', `🎬 展示：${demo.title}`)
+  addLog('warning', '⚠️ 搜索功能需后端支持，暂未实现')
   setSamuraiState('sheathing')
-  addLog('complete', '✅ 搜索完毕')
-  showResultDirect(demo)
+  addLog('complete', '❌ 搜索未完成')
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -1100,6 +1081,7 @@ function detectPlatform(text) {
   if (/instagram/i.test(text)) return 'instagram'
   if (/xiaohongshu/i.test(text)) return 'xiaohongshu'
   if (/weibo/i.test(text)) return 'weibo'
+  if (/channels\.weixin/i.test(text)) return 'shipinhao'
   if (!/^https?:\/\//i.test(text)) return 'search'
   return 'unknown'
 }
@@ -1110,6 +1092,7 @@ function platformLabel(p) {
     tencent: '腾讯视频', iqiyi: '爱奇艺', youku: '优酷',
     kuaishou: '快手', ixigua: '西瓜视频', twitter: 'Twitter/X',
     instagram: 'Instagram', xiaohongshu: '小红书', weibo: '微博',
+    shipinhao: '微信视频号',
     unknown: '未知网站',
   }
   return map[p] || p
