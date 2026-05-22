@@ -555,15 +555,68 @@ const DIRECT_PARSERS = [
 
 // ═════════════════════════════════════════════════════════════
 // 第二层：iframe 解析源（嵌入播放器，全平台通用）
+// 40+ 个源，自动批量探测可用性
 // ═════════════════════════════════════════════════════════════
 
 const IFRAME_SOURCES = [
+  // ── 主流稳定源 ──
   { name: '爱豆解析', url: (u) => `https://jx.aidouer.net/?url=${encodeURIComponent(u)}`, match: () => true },
   { name: '极速解析', url: (u) => `https://jiexi.071811.cc/jx.php?url=${encodeURIComponent(u)}`, match: () => true },
   { name: '星辰解析', url: (u) => `https://jx.wslmf.com/?url=${encodeURIComponent(u)}`, match: () => true },
   { name: '闪电解析', url: (u) => `https://api.pucms.com/?url=${encodeURIComponent(u)}`, match: () => true },
   { name: '米人直出', url: (u) => `https://api.mir6.com/api/bzjiexi?url=${encodeURIComponent(u)}&type=mp4`, match: (u) => /bilibili/i.test(u) },
+
+  // ── VIP解析源 ──
+  { name: 'M1907', url: (u) => `https://im1907.top/?jx=${encodeURIComponent(u)}`, match: () => true },
+  { name: '七哥解析', url: (u) => `https://jx.nnxv.cn/tv.php?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: 'HLS解析', url: (u) => `https://jx.hls.one/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '冰豆解析', url: (u) => `https://bd.jx.cn/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '789解析', url: (u) => `https://jiexi.789jiexi.com/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '极速二号', url: (u) => `https://jx.2s0.cn/player/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '麒麟解析', url: (u) => `https://t2.qlplayer.cyou/player/analysis.php?v=${encodeURIComponent(u)}`, match: () => true },
+  { name: '蟠古解析', url: (u) => `https://api.pangujiexi.com/player.php?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: 'OK解析', url: (u) => `https://jx.okokjx.com/okok/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '极速三号', url: (u) => `https://jx.km58.top/jx/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '快艇解析', url: (u) => `https://jx.kt111.top/jx/mf/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: 'FLV解析', url: (u) => `https://api.flvsp.com/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '番茄解析', url: (u) => `http://api.xfsub.com/index.php?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '骄点解析', url: (u) => `http://player.jidiaose.com/supapi/iframe.php?v=${encodeURIComponent(u)}`, match: () => true },
+  { name: '爱豆二号', url: (u) => `https://jx.iddou.cc/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '云解析', url: (u) => `http://2gty.com/apiurl/yun.php?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '通用解析', url: (u) => `http://api.visaok.net/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '青云解析', url: (u) => `http://api.baiyug.cn/vip/index.php?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '飞鸟解析', url: (u) => `http://api.51ckm.com/Box.php?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '1717解析', url: (u) => `http://www.1717yun.com/jx/ty.php?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '3A云', url: (u) => `https://www.3aym.cn/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '速读解析', url: (u) => `http://api.wlzhan.com/sudu/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '星云解析', url: (u) => `http://17kyun.com/api.php?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '乐播解析', url: (u) => `http://api.ledboke.com/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '快云解析', url: (u) => `http://api.47ks.com/webcloud/?v=${encodeURIComponent(u)}`, match: () => true },
+  { name: '玲珑解析', url: (u) => `http://api.lldyy.net/svip/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '极速六号', url: (u) => `http://jx.598110.com/index.php?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '七星解析', url: (u) => `http://api.91exp.com/svip/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '72度解析', url: (u) => `http://v.72du.com/api/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '二号云', url: (u) => `http://api.bbbbbb.me/ipsign/player.php?v=${encodeURIComponent(u)}`, match: () => true },
+  { name: '27V9解析', url: (u) => `http://www.27v9.cn/index.php?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '港星解析', url: (u) => `http://api.greatchina56.com/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '618G解析', url: (u) => `http://jx.618g.com/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '樱桃解析', url: (u) => `http://api.xyingyu.com/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '绿茶解析', url: (u) => `http://api.lvcha2017.cn/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: 'AKTV', url: (u) => `http://www.aktv.men/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: '九彩解析', url: (u) => `https://9kjx.com/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: 'AP2P解析', url: (u) => `https://jx.ap2p.cn/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: 'AT520', url: (u) => `http://at520.cn/jx/?url=${encodeURIComponent(u)}`, match: () => true },
+  { name: 'JYKKK', url: (u) => `http://api.jykkk.com/?url=${encodeURIComponent(u)}`, match: () => true },
 ]
+
+// ── 批量探测解析源可用性（并行 no-cors） ──
+async function probeSources(sources, input) {
+  const urls = sources.map(s => ({ src: s, url: s.url(input) }))
+  const results = await Promise.allSettled(urls.map(({ url }) =>
+    fetch(url, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(5000) })
+  ))
+  return sources.filter((_, i) => results[i].status === 'fulfilled')
+}
 
 // JSONP 辅助
 function jsonpFetch(url) {
@@ -696,30 +749,45 @@ async function handleParse() {
     await delay(300)
   }
 
-  // ── 阶段2：iframe 解析 ──
+  // ── 阶段2：iframe 解析 + 批量探测 ──
   setSamuraiState('draw')
-  addLog('info', '🔗 布下 iframe 解析大网...')
-  await delay(400)
+  addLog('info', '🔗 撒网！正在探测 40+ 解析源...')
+  await delay(300)
 
   const matchedIframes = IFRAME_SOURCES.filter(s => s.match(input))
-  if (matchedIframes.length === 0) {
-    addLog('warning', '此平台暂无可用 iframe 解析源')
-    await delay(200)
-  }
 
-  // 用第一个匹配的源展示
-  const firstSource = matchedIframes[0]
+  // 并行探测所有解析源（5秒超时）
+  let available = []
+  try {
+    available = await probeSources(matchedIframes, input)
+  } catch(e) {}
+
+  const alive = available.length
+  const total = matchedIframes.length
+
+  if (alive > 0) {
+    addLog('success', `📡 探测完毕：${alive}/${total} 个解析源存活`)
+  } else {
+    addLog('warning', `⚠️ 探测完毕：${total} 个源均无响应（可能都挂了）`)
+    if (matchedIframes.length > 0) {
+      addLog('info', '😤 不管了，直接上第一个试试...')
+      available = [matchedIframes[0]]
+    }
+  }
+  await delay(200)
+
+  const firstSource = available[0]
   iframeUrl = firstSource ? firstSource.url(input) : ''
 
   const metadata = parsed || { success: true, platform, title: `${platformLabel(platform)}视频`, author: '', cover: null, duration: null, bvid: null, qualities: [], subtitles: [] }
 
   if (iframeUrl) {
-    addLog('success', `🎯 ${firstSource.name}：iframe 已就绪！`)
+    addLog('success', `🎯 ${firstSource.name}：iframe 就位！`)
     await slashAnimation()
-    if (metadata.cover) { await slashAnimation(); addLog('info', '🖼️ 封面已拿下') }
+    if (metadata.cover) { await slashAnimation(); addLog('info', '🖼️ 封面拿下') }
     setSamuraiState('sheathing')
-    addLog('complete', '✅ iframe 解析完成，点击播放！')
-    showResultIframe(metadata, matchedIframes, input)
+    addLog('complete', `✅ iframe 搞定！${alive > 1 ? '还有 ' + (alive - 1) + ' 个备用源' : ''}`)
+    showResultIframe(metadata, available, input)
     return
   }
 
@@ -795,7 +863,7 @@ function showResultIframe(metadata, sources, input) {
   currentResult = metadata
   currentMode = 'iframe'
 
-  setModeBadge('iframe', 'iframe 解析')
+  setModeBadge('iframe', `iframe · ${sources.length}个源`)
   showCommonInfo(metadata)
 
   // 隐藏直链控件
@@ -815,7 +883,7 @@ function showResultIframe(metadata, sources, input) {
   document.getElementById('playBtn').disabled = true
   document.getElementById('downloadBtn').disabled = true
 
-  // 渲染解析源列表
+  // 渲染解析源列表（仅显示可用源）
   const list = document.getElementById('sourceList')
   list.innerHTML = ''
   sources.forEach((s, i) => {
